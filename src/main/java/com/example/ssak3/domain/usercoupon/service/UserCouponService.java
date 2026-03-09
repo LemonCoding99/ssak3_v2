@@ -1,5 +1,6 @@
 package com.example.ssak3.domain.usercoupon.service;
 
+import com.example.ssak3.common.aop.DistributedLock;
 import com.example.ssak3.common.enums.ErrorCode;
 import com.example.ssak3.common.enums.UserCouponStatus;
 import com.example.ssak3.common.enums.UserRole;
@@ -16,6 +17,7 @@ import com.example.ssak3.domain.usercoupon.model.response.UserCouponIssueRespons
 import com.example.ssak3.domain.usercoupon.model.response.UserCouponListGetResponse;
 import com.example.ssak3.domain.usercoupon.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserCouponService {
 
     private final UserCouponRepository userCouponRepository;
@@ -62,13 +65,14 @@ public class UserCouponService {
     /**
      * 쿠폰 발급 로직
      */
+    @DistributedLock(key = "#couponId")
     @Transactional
     public UserCouponIssueResponse issueCoupon(Long userId, Long couponId) {
-
+        long start = System.currentTimeMillis();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        Coupon coupon = couponRepository.findByIdWithLock(couponId)
+        Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_NOT_FOUND));
 
         List<UserCouponStatus> restrictedStatuses = List.of(
@@ -101,8 +105,9 @@ public class UserCouponService {
         );
 
         UserCoupon savedUserCoupon = userCouponRepository.save(userCoupon);
-
+        log.info("issueCoupon 처리시간: {}ms", System.currentTimeMillis() - start);
         return UserCouponIssueResponse.from(savedUserCoupon);
+
     }
 
     /**

@@ -9,6 +9,10 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +36,12 @@ import java.util.Map;
 
 @Configuration
 public class RedisConfig {
+
+    @Value("${spring.data.redis.host}")
+    private String redisHost;
+
+    @Value("${spring.data.redis.port}")
+    private int redisPort;
 
     /**
      * 카테고리 목록 조회 캐싱 설정
@@ -173,4 +183,15 @@ public class RedisConfig {
     public MessageListenerAdapter listenerAdapter(RedisSubscriber subscriber) {
         return new MessageListenerAdapter(subscriber, "onMessage");
     }
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        // 기존 Redis 연결 정보를 사용 (예: localhost:6379)
+        config.useSingleServer()
+                .setAddress("redis://" + redisHost + ":" + redisPort);
+
+        return Redisson.create(config);
+    }
+
 }
