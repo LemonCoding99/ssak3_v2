@@ -47,10 +47,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@TestPropertySource(properties = {
-        "spring.datasource.hikari.maximum-pool-size=110",
-        "spring.datasource.hikari.connection-timeout=30000"
-})
 class OrderServiceTest {
 
     @Autowired private OrderTestDataFixture fixture;
