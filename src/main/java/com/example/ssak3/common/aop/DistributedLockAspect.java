@@ -29,7 +29,7 @@ public class DistributedLockAspect {
     private final TransactionPropagation transactionPropagation; // 트랜잭션 전용 클래스
 
     @Around("@annotation(distributedLock)")
-    public Object lock(ProceedingJoinPoint joinPoint, DistributedLock distributedLock) throws Throwable {
+    public Object orderDistributedLock(ProceedingJoinPoint joinPoint, DistributedLock distributedLock) throws Throwable {
 
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
 
