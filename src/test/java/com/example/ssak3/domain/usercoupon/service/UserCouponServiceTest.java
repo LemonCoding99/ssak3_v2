@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,19 +37,21 @@ public class UserCouponServiceTest {
     private UserCouponRepository userCouponRepository;
 
     private List<Long> testUserIds = new ArrayList<>();
+
     private Long testCouponId;
 
     @BeforeEach
     void setUp() {
-        // 1. 기존 데이터 초기화 (Unique 제약 조건 충돌 방지)
-        userCouponRepository.deleteAll();
-        userRepository.deleteAll();
-        couponRepository.deleteAll();
+        // 기존 데이터 초기화 (Unique 제약 조건 충돌 방지)
+        userCouponRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+        couponRepository.deleteAllInBatch();
         testUserIds.clear();
 
-        // 2. 100명의 테스트 유저 생성 (Entity 구조 반영)
-        for (int i = 1; i <= 1000; i++) {
-            User user = new User(
+        // 100명의 테스트 유저 생성
+        List<User> users = new ArrayList<>();
+        for (int i = 1; i <= 150; i++) {
+            users.add(new User(
                     "테스터" + i,                         // name
                     "nick" + i,                          // nickname (Unique)
                     "test" + i + "@ssak3.com",           // email (Unique)
@@ -56,12 +59,12 @@ public class UserCouponServiceTest {
                     LocalDate.of(1995, 1, 1),            // birth
                     "010-0000-" + String.format("%04d", i), // phone (Unique)
                     "서울시 강남구"                        // address
-            );
-            User savedUser = userRepository.save(user);
-            testUserIds.add(savedUser.getId());
+            ));
         }
+        userRepository.saveAll(users);
+        users.forEach(u -> testUserIds.add(u.getId()));
 
-        // 3. 테스트용 쿠폰 생성 (Entity 구조 반영)
+        // 테스트용 쿠폰 생성
         Coupon coupon = new Coupon(
                 "선착순 100명 할인 쿠폰",                 // name
                 1000,                                   // discountValue
@@ -76,37 +79,40 @@ public class UserCouponServiceTest {
     }
 
     @Test
-    @DisplayName("100명이 동시에 쿠폰 발급을 요청했을 때, 정확히 100개의 수량이 차감되어야 한다")
+    @DisplayName("150명이 동시에 100개의 쿠폰에 달려들어도 정확히 100개만 발급되어야 한다")
     void issueCouponConcurrencyTest() throws InterruptedException {
         // Given
-        int threadCount = 100;
-        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        int threadCount = 150; // 쿠폰 수량(100)보다 많은 요청을 보내서 경쟁 유도
+        ExecutorService executorService = Executors.newFixedThreadPool(150); // 동시 처리 스레드 수
         CountDownLatch latch = new CountDownLatch(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount); // 150명이 동시에 '땅!' 하고 출발하게 함
 
         // When
         for (int i = 0; i < threadCount; i++) {
             Long userId = testUserIds.get(i);
             executorService.submit(() -> {
                 try {
-                    // 서비스 로직 호출 (DistributedLock 적용된 메서드)
+                    barrier.await(); // 모든 스레드가 준비될 때까지 대기
                     userCouponService.issueCoupon(userId, testCouponId);
                 } catch (Exception e) {
-                    System.err.println("발급 실패 [User:" + userId + "]: " + e.getMessage());
+                    // 100개가 넘어가면 예외가 발생하는 것이 정상 (로그 확인용)
+                    // System.err.println("발급 실패: " + e.getMessage());
                 } finally {
                     latch.countDown();
                 }
             });
         }
 
-        latch.await(); // 모든 스레드 작업 완료 대기
+        latch.await(); // 모든 작업 완료 대기
+        executorService.shutdown();
 
         // Then
-        Coupon coupon = couponRepository.findById(testCouponId)
-                .orElseThrow(() -> new RuntimeException("쿠폰을 찾을 수 없습니다."));
+        Coupon coupon = couponRepository.findById(testCouponId).orElseThrow();
 
-        System.out.println("최종 발급 수량: " + coupon.getIssuedQuantity());
+        System.out.println("결과 - 총 요청: " + threadCount + "건");
+        System.out.println("결과 - 최종 발급 수량: " + coupon.getIssuedQuantity());
 
-        // 결과 검증: 분산락이 정상 작동한다면 정확히 100이어야 함
+        // 분산 락이 정상이라면 150명이 요청해도 결과는 반드시 100이어야 함
         assertEquals(100, coupon.getIssuedQuantity());
     }
 }

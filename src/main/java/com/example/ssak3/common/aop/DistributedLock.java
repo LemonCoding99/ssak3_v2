@@ -12,5 +12,5 @@ public @interface DistributedLock {
     String key();
     TimeUnit timeUnit() default TimeUnit.SECONDS;
     long waitTime() default 5L;  // 락 획득 (최대)대기시간
-    long leaseTime() default 3L;  // 락 점유 시간
+    long leaseTime() default 2L;  // 락 점유 시간
 }
