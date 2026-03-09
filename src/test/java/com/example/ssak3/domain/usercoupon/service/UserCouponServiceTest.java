@@ -1,5 +1,6 @@
 package com.example.ssak3.domain.usercoupon.service;
 
+import com.example.ssak3.domain.cart.repository.CartRepository;
 import com.example.ssak3.domain.coupon.entity.Coupon;
 import com.example.ssak3.domain.coupon.repository.CouponRepository;
 import com.example.ssak3.domain.user.entity.User;
@@ -28,6 +29,9 @@ public class UserCouponServiceTest {
     private UserCouponService userCouponService;
 
     @Autowired
+    private CartRepository cartRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -44,6 +48,7 @@ public class UserCouponServiceTest {
     void setUp() {
         // 기존 데이터 초기화 (Unique 제약 조건 충돌 방지)
         userCouponRepository.deleteAllInBatch();
+        cartRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
         couponRepository.deleteAllInBatch();
         testUserIds.clear();

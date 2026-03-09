@@ -85,6 +85,9 @@ dependencies {
 
     // OAuth 의존성
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    // Redisson 의존성
+    implementation 'org.redisson:redisson-spring-boot-starter:3.27.2'
 }
 
 tasks.named('test') {

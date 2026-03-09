@@ -69,14 +69,14 @@ public class OrderService {
     @Transactional
     public OrderCreateResponse createOrderFromProduct(Long userId, OrderCreateFromProductRequest request) {
 
-        User user = userRepository.findByIdWithLock(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         if (orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PAYMENT_PENDING)) {
             throw new CustomException(ErrorCode.ORDER_PAYMENT_PENDING_EXISTS);
         }
 
-        Product product = productRepository.findByIdForLock(request.getProductId())
+        Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
         int quantity = request.getQuantity();
@@ -134,11 +134,13 @@ public class OrderService {
 
     /**
      * 장바구니에서 여러 상품 주문
+     * 키를 리스트로 받아서 멀티 락 처리
      */
     @Transactional
     public OrderCreateResponse createOrderFromCart(Long userId, OrderCreateFromCartRequest request) {
 
-        User user = userRepository.findByIdWithLock(userId)
+        // 락이 이미 유저와 상품들을 모두 잡고 있으므로 여기서는 순수 비즈니스 로직과 DB 상태 체크만 수행하면 됨
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         if (orderRepository.existsByUserIdAndStatus(userId, OrderStatus.PAYMENT_PENDING)) {
@@ -167,7 +169,7 @@ public class OrderService {
         Map<Long, Integer> unitPriceMap = new HashMap<>();
 
         for (CartProduct cartProduct : cartProductList) {
-            Product lockedProduct = productRepository.findByIdForLock(cartProduct.getProduct().getId())
+            Product lockedProduct = productRepository.findById(cartProduct.getProduct().getId())
                     .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
             int quantity = cartProduct.getQuantity();

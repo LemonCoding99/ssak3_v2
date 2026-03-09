@@ -30,9 +30,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
 
     boolean existsByCategoryId(Long categoryId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select p from Product p where p.id = :productId and p.isDeleted = false")
-    Optional<Product> findByIdForLock(@Param("productId") Long productId);
+//    @Lock(LockModeType.PESSIMISTIC_WRITE)
+//    @Query("select p from Product p where p.id = :productId and p.isDeleted = false")
+//    Optional<Product> findByIdForLock(@Param("productId") Long productId);
 
     List<Product> findAllByIdInAndIsDeletedFalse(List<Long> productIdList);
 }
