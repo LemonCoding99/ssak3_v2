@@ -6,11 +6,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.concurrent.TimeUnit;
 
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)  // 메서드 위에서만 사용 가능
+@Retention(RetentionPolicy.RUNTIME)  // 프로그램 실행중에도 참조 가능
 public @interface DistributedLock {
-    String key(); // 락 이름 (ex. lock:product:1)
-    long waitTime() default 5L; // 락 획득 대기시간
-    long leaseTime() default 3L; // 락 점유 시간
-    TimeUnit timeUnit() default TimeUnit.SECONDS; // 시간 단위
+    String key();
+    TimeUnit timeUnit() default TimeUnit.SECONDS;
+    long waitTime() default 5L;  // 락 획득 (최대)대기시간
+    long leaseTime() default 2L;  // 락 점유 시간
 }

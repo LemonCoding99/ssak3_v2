@@ -20,10 +20,6 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
             "AND c.isDeleted = false")
     Page<Coupon> findAllAvailableCoupons(LocalDateTime now, Pageable pageable);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select c from Coupon c where c.id = :id")
-    Optional<Coupon> findByIdWithLock(@Param("id") Long id);
-
     Page<Coupon> findAllByIsDeletedFalse(Pageable pageable);
 
     boolean existsByNameAndIsDeletedFalse(String name);
