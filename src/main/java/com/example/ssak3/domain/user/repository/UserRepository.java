@@ -23,7 +23,7 @@ public interface UserRepository extends JpaRepository<User, Long>, UserCustomRep
 
     Optional<User> findByEmail(String email);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select u from User u where u.id = :userId and u.isDeleted = false")
-    Optional<User> findByIdWithLock(@Param("userId") Long userId);
+//    @Lock(LockModeType.PESSIMISTIC_WRITE)
+//    @Query("select u from User u where u.id = :userId and u.isDeleted = false")
+//    Optional<User> findByIdWithLock(@Param("userId") Long userId);
 }

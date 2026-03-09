@@ -53,6 +53,12 @@ public enum ErrorCode {
     ORDER_PRICE_CHANGED(HttpStatus.BAD_REQUEST, "가격이 변경된 상품이 있습니다."),
     USER_NOT_PURCHASED_PRODUCT(HttpStatus.FORBIDDEN, "해당 상품을 구매한 사용자만 이용할 수 있습니다."),
 
+    // Lock 에러
+    LOCK_ACQUISITION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "락 획득에 실패했습니다."),
+
+    // 내부 서버 에러
+    SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "내부 서버 에러입니다."),
+
     // TimeDeal 에러
     TIME_DEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 세일 상품을 찾을 수 없습니다."),
     SALE_PRICE_MUST_BE_LOWER_THAN_ORIGINAL_PRICE(HttpStatus.BAD_REQUEST, "할인가는 정가보다 낮아야 합니다."),

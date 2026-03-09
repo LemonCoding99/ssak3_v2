@@ -13,6 +13,8 @@ import com.example.ssak3.domain.category.entity.Category;
 import com.example.ssak3.domain.category.repository.CategoryRepository;
 import com.example.ssak3.domain.coupon.entity.Coupon;
 import com.example.ssak3.domain.coupon.repository.CouponRepository;
+import com.example.ssak3.domain.order.OrderRedissonFacade;
+import com.example.ssak3.domain.order.OrderTestDataFixture;
 import com.example.ssak3.domain.order.entity.Order;
 import com.example.ssak3.domain.order.model.request.OrderCreateFromCartRequest;
 import com.example.ssak3.domain.order.model.request.OrderCreateFromProductRequest;
@@ -32,18 +34,26 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
+@TestPropertySource(properties = {
+        "spring.datasource.hikari.maximum-pool-size=110",
+        "spring.datasource.hikari.connection-timeout=30000"
+})
 class OrderServiceTest {
+
+    @Autowired private OrderTestDataFixture fixture;
 
     @Autowired
     private OrderService orderService;
@@ -68,6 +78,8 @@ class OrderServiceTest {
     private CouponRepository couponRepository;
     @Autowired
     private UserCouponRepository userCouponRepository;
+    @Autowired
+    private OrderRedissonFacade orderRedissonFacade;
 
     @BeforeEach
     void clean() {
@@ -78,20 +90,56 @@ class OrderServiceTest {
         cartRepository.deleteAllInBatch();
         userCouponRepository.deleteAllInBatch();
         couponRepository.deleteAllInBatch();
+
+        // 외래키 제약 조건 때문에 최상위 부모 테이블을 마지막에 삭제
+        userRepository.deleteAllInBatch();
+        productRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
     }
 
+    @Test
+    @DisplayName("동시에 100명이 주문할 때 재고가 정확히 차감되어야 한다.")
+    void stock_concurrency_test() throws InterruptedException {
+        // Given: 재고가 100개인 상품 준비
+        int threadCount = 100;
+        Product product = fixture.createTestProduct(100); // 초기 재고 100개
+
+        OrderCreateFromProductRequest request = new OrderCreateFromProductRequest(
+                product.getId(),
+                1, // 한 번에 1개씩 주문
+                "서울시",
+                null
+        );
+
+        ExecutorService executorService = Executors.newFixedThreadPool(100);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        // When: 100개의 스레드가 동시에 주문 호출
+        for (int i = 0; i < threadCount; i++) {
+            User user = fixture.createTestUser();
+
+            executorService.submit(() -> {
+                try {
+                    orderRedissonFacade.createOrderFromProduct(user.getId(), request);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await(); // 모든 스레드가 끝날 때까지 대기
+
+        // Then: 최종 재고가 0인지 확인
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getQuantity()).isEqualTo(0);
+    }
 
     @Test
     @DisplayName("단일 상품 주문 통합 테스트 - 주문/주문상품 저장 + 재고 차감 + 결제대기 상태")
     void createOrderFromProduct_통합테스트_paymentPending() {
         // Given
-        User user = new User("test3", "user3", "test3@test.com", "Aa12345678!!", LocalDate.of(2026, 2, 2), "010-0003-0000", "서울특별시 노원구");
-        userRepository.save(user);
-
-        Category category = new Category("test");
-        categoryRepository.save(category);
-        Product product = new Product(category, "테스트 상품명", 10000, ProductStatus.FOR_SALE, "설명", 10, null, null);
-        productRepository.save(product);
+        User user = fixture.createTestUser();
+        Product product = fixture.createTestProduct(10);
 
         OrderCreateFromProductRequest request = new OrderCreateFromProductRequest(
                 product.getId(),
@@ -126,79 +174,6 @@ class OrderServiceTest {
 
         Product reloaded = productRepository.findById(product.getId()).orElseThrow();
         assertThat(reloaded.getQuantity()).isEqualTo(8);
-    }
-
-    @Test
-    @DisplayName("장바구니 상품 주문 통합 테스트 - 주문/주문상품 저장 + 재고 차감 + 결제대기 상태")
-    void createOrderFromCart_통합테스트_paymentPending() {
-        // Given: 유저
-        User user = new User("test4", "user4", "test4@test.com", "Aa12345678!!",
-                LocalDate.of(2026, 2, 2), "010-0004-0000", "서울특별시 노원구");
-        userRepository.save(user);
-
-        // Given: 카테고리
-        Category category = new Category("test");
-        categoryRepository.save(category);
-
-        // Given: 상품 2개
-        Product p1 = new Product(category, "상품1", 10000, ProductStatus.FOR_SALE, "설명", 10, null, null);
-        Product p2 = new Product(category, "상품2", 15000, ProductStatus.FOR_SALE, "설명", 5, null, null);
-        productRepository.save(p1);
-        productRepository.save(p2);
-
-        // Given: 장바구니 + 장바구니 상품들
-        Cart cart = new Cart(user);
-        cartRepository.save(cart);
-
-        CartProduct cp1 = new CartProduct(cart, p1, null, 2);
-        CartProduct cp2 = new CartProduct(cart, p2, null, 1);
-        cartProductRepository.save(cp1);
-        cartProductRepository.save(cp2);
-
-        OrderCreateFromCartRequest request = new OrderCreateFromCartRequest(
-                cart.getId(),
-                List.of(cp1.getId(), cp2.getId()),
-                "서울시",
-                null
-        );
-
-        // When
-        OrderCreateResponse response = orderService.createOrderFromCart(user.getId(), request);
-
-        // Then
-        assertThat(response.getSubtotal()).isEqualTo(35000);
-        assertThat(response.getDeliveryFee()).isEqualTo(0);
-        assertThat(response.getDiscount()).isEqualTo(0);
-        assertThat(response.getPaymentUrl()).isNotBlank();
-
-        List<Order> orders = orderRepository.findAll();
-        assertThat(orders).hasSize(1);
-
-        Order savedOrder = orders.get(0);
-        assertThat(savedOrder.getUser().getId()).isEqualTo(user.getId());
-        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
-        assertThat(savedOrder.getTotalPrice()).isEqualTo(35000);
-
-        List<OrderProduct> ops = orderProductRepository.findByOrderId(savedOrder.getId());
-        assertThat(ops).hasSize(2);
-
-        OrderProduct op1 = ops.stream()
-                .filter(op -> op.getProduct().getId().equals(p1.getId()))
-                .findFirst().orElseThrow();
-        OrderProduct op2 = ops.stream()
-                .filter(op -> op.getProduct().getId().equals(p2.getId()))
-                .findFirst().orElseThrow();
-
-        assertThat(op1.getUnitPrice()).isEqualTo(10000);
-        assertThat(op1.getQuantity()).isEqualTo(2);
-        assertThat(op2.getUnitPrice()).isEqualTo(15000);
-        assertThat(op2.getQuantity()).isEqualTo(1);
-        Product reloaded1 = productRepository.findById(p1.getId()).orElseThrow();
-        Product reloaded2 = productRepository.findById(p2.getId()).orElseThrow();
-        assertThat(reloaded1.getQuantity()).isEqualTo(8); // 10 - 2
-        assertThat(reloaded2.getQuantity()).isEqualTo(4); // 5 - 1
-        assertThat(op1.getCartProductId()).isEqualTo(cp1.getId());
-        assertThat(op2.getCartProductId()).isEqualTo(cp2.getId());
     }
 
     @Test
@@ -258,6 +233,65 @@ class OrderServiceTest {
 
         assertThat(orderRepository.findAll()).isEmpty();
         assertThat(userCoupon.getStatus()).isEqualTo(UserCouponStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("장바구니 상품 주문 통합 테스트 - 주문/주문상품 저장 + 재고 차감 + 결제대기 상태")
+    void createOrderFromCart_통합테스트_paymentPending() {
+        User user = fixture.createTestUser();
+        Cart cart = fixture.createCartWithProducts(user);
+
+        List<CartProduct> cartProducts = cartProductRepository.findByCartId(cart.getId());
+
+        Product p1 = cartProducts.get(0).getProduct();
+        Product p2 = cartProducts.get(1).getProduct();
+        CartProduct cp1 = cartProducts.get(0);
+        CartProduct cp2 = cartProducts.get(1);
+
+        OrderCreateFromCartRequest request = new OrderCreateFromCartRequest(
+                cart.getId(),
+                List.of(cp1.getId(), cp2.getId()),
+                "서울시",
+                null
+        );
+
+        // When
+        OrderCreateResponse response = orderService.createOrderFromCart(user.getId(), request);
+
+        // Then
+        assertThat(response.getSubtotal()).isEqualTo(35000);
+        assertThat(response.getDeliveryFee()).isEqualTo(0);
+        assertThat(response.getDiscount()).isEqualTo(0);
+        assertThat(response.getPaymentUrl()).isNotBlank();
+
+        List<Order> orders = orderRepository.findAll();
+        assertThat(orders).hasSize(1);
+
+        Order savedOrder = orders.get(0);
+        assertThat(savedOrder.getUser().getId()).isEqualTo(user.getId());
+        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(savedOrder.getTotalPrice()).isEqualTo(35000);
+
+        List<OrderProduct> ops = orderProductRepository.findByOrderId(savedOrder.getId());
+        assertThat(ops).hasSize(2);
+
+        OrderProduct op1 = ops.stream()
+                .filter(op -> op.getProduct().getId().equals(p1.getId()))
+                .findFirst().orElseThrow();
+        OrderProduct op2 = ops.stream()
+                .filter(op -> op.getProduct().getId().equals(p2.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(op1.getUnitPrice()).isEqualTo(10000);
+        assertThat(op1.getQuantity()).isEqualTo(2);
+        assertThat(op2.getUnitPrice()).isEqualTo(15000);
+        assertThat(op2.getQuantity()).isEqualTo(1);
+        Product reloaded1 = productRepository.findById(p1.getId()).orElseThrow();
+        Product reloaded2 = productRepository.findById(p2.getId()).orElseThrow();
+        assertThat(reloaded1.getQuantity()).isEqualTo(8); // 10 - 2
+        assertThat(reloaded2.getQuantity()).isEqualTo(4); // 5 - 1
+        assertThat(op1.getCartProductId()).isEqualTo(cp1.getId());
+        assertThat(op2.getCartProductId()).isEqualTo(cp2.getId());
     }
 
 }
