@@ -184,6 +184,9 @@ public class RedisConfig {
         return new MessageListenerAdapter(subscriber, "onMessage");
     }
 
+    /**
+     * Redisson 설정
+     */
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();

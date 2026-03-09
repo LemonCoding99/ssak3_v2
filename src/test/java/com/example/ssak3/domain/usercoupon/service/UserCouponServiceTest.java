@@ -1,8 +1,14 @@
 package com.example.ssak3.domain.usercoupon.service;
 
 import com.example.ssak3.domain.cart.repository.CartRepository;
+import com.example.ssak3.domain.cartproduct.repository.CartProductRepository;
+import com.example.ssak3.domain.category.repository.CategoryRepository;
 import com.example.ssak3.domain.coupon.entity.Coupon;
 import com.example.ssak3.domain.coupon.repository.CouponRepository;
+import com.example.ssak3.domain.order.repository.OrderRepository;
+import com.example.ssak3.domain.orderProduct.repository.OrderProductRepository;
+import com.example.ssak3.domain.payment.repository.PaymentRepository;
+import com.example.ssak3.domain.product.repository.ProductRepository;
 import com.example.ssak3.domain.user.entity.User;
 import com.example.ssak3.domain.user.repository.UserRepository;
 import com.example.ssak3.domain.usercoupon.repository.UserCouponRepository;
@@ -25,11 +31,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 public class UserCouponServiceTest {
+
     @Autowired
     private UserCouponService userCouponService;
 
     @Autowired
-    private CartRepository cartRepository;
+    private UserCouponRepository userCouponRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -38,7 +45,25 @@ public class UserCouponServiceTest {
     private CouponRepository couponRepository;
 
     @Autowired
-    private UserCouponRepository userCouponRepository;
+    private CartRepository cartRepository;
+
+    @Autowired
+    private CartProductRepository cartProductRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderProductRepository orderProductRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     private List<Long> testUserIds = new ArrayList<>();
 
@@ -46,11 +71,17 @@ public class UserCouponServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 기존 데이터 초기화 (Unique 제약 조건 충돌 방지)
-        userCouponRepository.deleteAllInBatch();
+        // 기존 데이터 초기화
+        orderProductRepository.deleteAllInBatch();
+        paymentRepository.deleteAllInBatch();
+        cartProductRepository.deleteAllInBatch();
+        orderRepository.deleteAllInBatch();
         cartRepository.deleteAllInBatch();
+        userCouponRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
         couponRepository.deleteAllInBatch();
+        productRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
         testUserIds.clear();
 
         // 100명의 테스트 유저 생성
@@ -84,13 +115,13 @@ public class UserCouponServiceTest {
     }
 
     @Test
-    @DisplayName("150명이 동시에 100개의 쿠폰에 달려들어도 정확히 100개만 발급되어야 한다")
+    @DisplayName("동시성 제어 테스트: 150명 동시 요청 시 한정된 쿠폰 100개 정합성 보장")
     void issueCouponConcurrencyTest() throws InterruptedException {
         // Given
         int threadCount = 150; // 쿠폰 수량(100)보다 많은 요청을 보내서 경쟁 유도
         ExecutorService executorService = Executors.newFixedThreadPool(150); // 동시 처리 스레드 수
         CountDownLatch latch = new CountDownLatch(threadCount);
-        CyclicBarrier barrier = new CyclicBarrier(threadCount); // 150명이 동시에 '땅!' 하고 출발하게 함
+        CyclicBarrier barrier = new CyclicBarrier(threadCount); // 150명이 동시에 출발
 
         // When
         for (int i = 0; i < threadCount; i++) {
@@ -117,7 +148,7 @@ public class UserCouponServiceTest {
         System.out.println("결과 - 총 요청: " + threadCount + "건");
         System.out.println("결과 - 최종 발급 수량: " + coupon.getIssuedQuantity());
 
-        // 분산 락이 정상이라면 150명이 요청해도 결과는 반드시 100이어야 함
+        // 분산 락이 정상이라면 150명이 요청해도 결과는 반드시 100
         assertEquals(100, coupon.getIssuedQuantity());
     }
 }
