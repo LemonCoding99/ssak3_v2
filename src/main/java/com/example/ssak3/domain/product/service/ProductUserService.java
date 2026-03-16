@@ -4,6 +4,7 @@ import com.example.ssak3.common.enums.ErrorCode;
 import com.example.ssak3.common.enums.ProductStatus;
 import com.example.ssak3.common.exception.CustomException;
 import com.example.ssak3.common.model.PageResponse;
+import com.example.ssak3.domain.product.event.ProductViewEvent;
 import com.example.ssak3.domain.product.entity.Product;
 import com.example.ssak3.domain.product.model.response.ProductGetResponse;
 import com.example.ssak3.domain.product.model.response.ProductListGetResponse;
@@ -13,6 +14,7 @@ import com.example.ssak3.domain.timedeal.entity.TimeDeal;
 import com.example.ssak3.domain.timedeal.repository.TimeDealRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,27 +26,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductUserService {
 
     private final ProductRepository productRepository;
-    private final ProductRankingService productRankingService;
     private final S3Uploader s3Uploader;
     private final TimeDealRepository timeDealRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 상품 상세 조회 (사용자)
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public ProductGetResponse getProduct(Long productId, String ip) {
 
+        // 상품 조회
         Product foundProduct = productRepository.findByIdAndIsDeletedFalse(productId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
+        // 이벤트 발행
+        eventPublisher.publishEvent(new ProductViewEvent(productId, ip));
+
         if (foundProduct.getStatus().equals(ProductStatus.STOP_SALE) || foundProduct.getStatus().equals(ProductStatus.BEFORE_SALE)) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_VIEWABLE);
-        }
-
-        try {
-            productRankingService.increaseViewCount(productId, ip);
-        } catch (Exception e) {
-            log.warn("Redis 조회수 업데이트 실패: productId = {}", foundProduct.getId());
         }
 
         String viewImageUrl = s3Uploader.createPresignedGetUrl(foundProduct.getImage(), 5);

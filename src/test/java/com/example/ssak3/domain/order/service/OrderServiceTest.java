@@ -13,7 +13,6 @@ import com.example.ssak3.domain.category.entity.Category;
 import com.example.ssak3.domain.category.repository.CategoryRepository;
 import com.example.ssak3.domain.coupon.entity.Coupon;
 import com.example.ssak3.domain.coupon.repository.CouponRepository;
-import com.example.ssak3.domain.order.OrderRedissonFacade;
 import com.example.ssak3.domain.order.OrderTestDataFixture;
 import com.example.ssak3.domain.order.entity.Order;
 import com.example.ssak3.domain.order.model.request.OrderCreateFromCartRequest;
