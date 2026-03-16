@@ -13,7 +13,6 @@ import com.example.ssak3.domain.category.entity.Category;
 import com.example.ssak3.domain.category.repository.CategoryRepository;
 import com.example.ssak3.domain.coupon.entity.Coupon;
 import com.example.ssak3.domain.coupon.repository.CouponRepository;
-import com.example.ssak3.domain.order.OrderRedissonFacade;
 import com.example.ssak3.domain.order.OrderTestDataFixture;
 import com.example.ssak3.domain.order.entity.Order;
 import com.example.ssak3.domain.order.model.request.OrderCreateFromCartRequest;
@@ -34,7 +33,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -110,6 +108,8 @@ class OrderServiceTest {
         ExecutorService executorService = Executors.newFixedThreadPool(100);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
+        Long startTime = System.nanoTime();
+
         // When: 100개의 스레드가 동시에 주문 호출
         for (int i = 0; i < threadCount; i++) {
             User user = fixture.createTestUser();
@@ -125,9 +125,15 @@ class OrderServiceTest {
 
         latch.await(); // 모든 스레드가 끝날 때까지 대기
 
+        long endTime = System.nanoTime();
+        long executionTime = endTime - startTime;
+        double durationMs = (double) executionTime / 1_000_000; // ms 단위
+        System.out.println("총 실행 시간:" + durationMs);
+
         // Then: 최종 재고가 0인지 확인
         Product reloaded = productRepository.findById(product.getId()).orElseThrow();
         assertThat(reloaded.getQuantity()).isEqualTo(0);
+        assertThat(orderRepository.count()).isEqualTo(100);
     }
 
     @Test

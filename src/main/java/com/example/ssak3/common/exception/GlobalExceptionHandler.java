@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ApiResponse> customException(CustomException e) {
 
-        log.error("EXCEPTION: {}", e.getMessage());
+        log.error("EXCEPTION: ", e);
 
         ErrorCode errorCode = e.getErrorCode();
 
@@ -30,7 +30,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse> methodArgumentNotValidException(MethodArgumentNotValidException e) {
 
-        log.error("EXCEPTION: {}", e.getMessage());
+        log.error("EXCEPTION: ", e);
 
         String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
 
@@ -42,7 +42,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse> HttpMessageNotReadableException(HttpMessageNotReadableException e) {
 
-        log.error("EXCEPTION: {}", e.getMessage());
+        log.error("EXCEPTION: ", e);
 
         ApiResponse response = ApiResponse.error("올바르지 않은 타입입니다.");
 
@@ -52,7 +52,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse> MethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
 
-        log.error("EXCEPTION: {}", e.getMessage());
+        log.error("EXCEPTION: ", e);
 
         ApiResponse response = ApiResponse.error("올바르지 않은 타입입니다.");
 
@@ -62,7 +62,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse> internalServerException(Exception e) {
 
-        log.error("EXCEPTION: {}", e.getMessage());
+        log.error("EXCEPTION: ", e);
 
         ApiResponse response = ApiResponse.error("내부 서버 에러입니다.");
 

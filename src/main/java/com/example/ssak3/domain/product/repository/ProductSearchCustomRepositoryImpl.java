@@ -5,6 +5,7 @@ import com.example.ssak3.common.enums.TimeDealStatus;
 import com.example.ssak3.domain.product.model.response.ProductGetSearchResponse;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -88,9 +89,33 @@ public class ProductSearchCustomRepositoryImpl implements ProductSearchCustomRep
 
     }
 
+//    private BooleanExpression nameContains(String keyword) {
+//
+//        if (keyword == null || keyword.isBlank()) {
+//            return null;
+//        }
+//
+//        // Expression.numberTemplate을 사용하여 DB 전용 함수를 호출
+//        return Expressions.numberTemplate(
+//                Double.class,
+//                "function('match_against', {0}, {1})",
+//                product.name,
+//                keyword + "*"
+//        ).gt(0); // Boolean Mode에서는 와일드카드(*)를 자주 씀
+//    }
+
     private BooleanExpression nameContains(String keyword) {
 
-        return (keyword != null && !keyword.isBlank()) ? product.name.contains(keyword) : null;
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+
+        return Expressions.numberTemplate(
+                Double.class,
+                "function('match_against', {0}, {1})",
+                product.name,
+                keyword
+        ).gt(0);
     }
 
     private BooleanExpression priceGoe(Integer minPrice) {

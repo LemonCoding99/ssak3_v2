@@ -9,6 +9,9 @@ import com.example.ssak3.domain.s3.service.S3Uploader;
 import com.example.ssak3.domain.timedeal.entity.TimeDeal;
 import com.example.ssak3.domain.timedeal.repository.TimeDealRepository;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RScoredSortedSet;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -16,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 public class ProductRankingService {
 
     private final StringRedisTemplate redisTemplate;
+    private final RedissonClient redissonClient;
     private static final String PRODUCT_DAILY_RANKING_PREFIX = "product:ranking:";
     private static final String PRODUCT_WEEKLY_RANKING_KEY = "product:ranking:weekly";
     private static final String PRODUCT_VIEW_CHECK_PREFIX = "product:view:check:ip:";
@@ -53,10 +56,15 @@ public class ProductRankingService {
         Double score = redisTemplate.opsForZSet().incrementScore(PRODUCT_DAILY_RANKING_PREFIX + nowDay, productId.toString(), 1);
 
         if (score != null && score == 1.0) {
+            // 해당 랭킹 키에 대한 Redisson 객체 가져오기
+            RScoredSortedSet<String> dailyRanking = redissonClient.getScoredSortedSet(PRODUCT_DAILY_RANKING_PREFIX + nowDay, StringCodec.INSTANCE);
 
-            LocalDateTime dayViewCountExp = nowDay.plusDays(10).atStartOfDay();
+            // 10일 뒤 자정까지 남은 시간 계산
+            LocalDateTime midnightTenDaysLater = nowDay.plusDays(10).atStartOfDay();
+            Duration durationUntilMidnight = Duration.between(LocalDateTime.now(), midnightTenDaysLater);
 
-            redisTemplate.expireAt(PRODUCT_DAILY_RANKING_PREFIX + nowDay, dayViewCountExp.atZone(ZoneId.systemDefault()).toInstant());
+            // Redisson의 expire 메서드 호출 (expiredAt은 stack over flow 발생)
+            dailyRanking.expire(durationUntilMidnight);
         }
 
     }

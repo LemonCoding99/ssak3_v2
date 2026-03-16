@@ -14,6 +14,7 @@ spring:
     properties:
       hibernate:
         format_sql: false
+        dialect: com.example.ssak3.common.config.CustomMySQLDialect
     show-sql: false
   jackson:
     time-zone: Asia/Seoul

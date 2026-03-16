@@ -58,7 +58,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
     // Redisson 의존성
-    implementation 'org.redisson:redisson-spring-boot-starter:3.27.0'
+    implementation 'org.redisson:redisson-spring-boot-starter:3.35.0'
 
     // LocalDate & LocalDateTime 파싱 의존성
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
